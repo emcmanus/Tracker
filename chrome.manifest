@@ -1,3 +1,7 @@
 content rendertracker content/
 
-overlay chrome://browser/content/browser.xul         chrome://rendertracker/browserOverlay.xul
+locale	rendertracker	en-US	locale/en-US/
+skin	rendertracker	classic/1.0	skin/
+
+overlay chrome://browser/content/browser.xul         chrome://rendertracker/content/browserOverlay.xul
+style	chrome://global/content/customizeToolbar.xul	chrome://rendertracker/skin/overlay.css
