@@ -7,3 +7,16 @@ Quick Guide - Render Tracker
 #### Building ####
 
 `ant pack`
+
+
+#### Development Install ####
+
+You can point Firefox to this repo and it'll load it up every time you restart Firefox.
+
+Locate your profile folder and beneath it the profile you want to work with (e.g. /Users/`<user>`/Library/Application Support/Firefox/Profiles/`<profile_id>`.default).
+
+Open the extensions/ folder, creating it if need be.
+
+Create a new text file called `rendertracker@rendertracker.com` and put the full path to this repo inside.
+
+Restart Firefox.
