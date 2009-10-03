@@ -1,0 +1,3 @@
+content rendertracker jar:chrome/rendertracker.jar!/content/rendertracker/
+
+overlay chrome://browser/content/browser.xul         chrome://rendertracker/content/browserOverlay.xul
