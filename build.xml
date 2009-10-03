@@ -1,0 +1,46 @@
+<?xml version="1.0" ?>
+
+<project name="RenderTracker" default="pack">
+	
+	<!-- Alias -->
+	<target name="pack" depends="zipIntoXPI">
+	</target>
+	
+    <!-- Project directories -->
+    <property name="src_dir" location="." />
+    <property name="build_dir" location="./build" />
+    <property name="dist_dir" location="./dist" />
+	
+    <property name="excludes" value="**/.*, **/*.jar, **/*.db, **/*.git" />
+
+    <!-- Targets -->
+    <target name="clean">
+        <delete dir="${build_dir}" />
+        <delete dir="${dist_dir}" />
+    </target>
+
+    <!-- Distribution XPI Targets -->
+    <target name="createChromeJAR">
+        <mkdir dir="${build_dir}" />
+        <zip destfile="${build_dir}/${ant.project.name}.jar" update="true" basedir="${src_dir}"
+            includes="content/**, locale/**, skin/**" excludes="${excludes}"/>
+    </target>
+
+    <target name="zipIntoXPI" depends="clean, createChromeJAR">
+        <mkdir dir="${dist_dir}" />
+        <copy todir="${build_dir}">
+            <fileset dir="${src_dir}" includes="*.manifest"/>
+        </copy>
+        <zip destfile="${dist_dir}/${ant.project.name}.xpi" update="true">
+            <zipfileset dir="${build_dir}" includes="*.jar" prefix="chrome" />
+            <!-- <zipfileset dir="${src_dir}" includes="icons/**" prefix="chrome" excludes="${excludes}" />
+            <zipfileset dir="${src_dir}/platform" includes="**" prefix="platform" excludes="${excludes}, **/skin/**" />
+            <zipfileset dir="${src_dir}/components" includes="*.js" prefix="components" />
+            <zipfileset dir="${src_dir}/components" includes="*.xpt" prefix="components" />
+            <zipfileset dir="${src_dir}/defaults" includes="**" prefix="defaults" excludes="${excludes}" /> -->
+            <zipfileset dir="${src_dir}" includes="install.rdf" />
+            <zipfileset dir="${build_dir}" includes="*.manifest" />
+        </zip>
+    </target>
+
+</project>
