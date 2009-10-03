@@ -7,7 +7,7 @@
 <binding id="initializer">
     <implementation>
         <constructor><![CDATA[
-           alert("Status-bar constructor hook fired");
+           renderTracker.initialize(this);
         ]]></constructor>
     </implementation>
 </binding>

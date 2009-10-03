@@ -1,7 +1,11 @@
-var rendertracker = {
-  onLoad: function() {
-    // initialization code
-  }
+var rendertracker = function(){
+	this.context = null;
 };
 
-window.addEventListener("load", function(e) { rendertracker.onLoad(e); }, false);
+rendertracker.prototype = {
+	initialize: function( context )
+	{
+		this.context = context;
+		// ...
+	}
+}
