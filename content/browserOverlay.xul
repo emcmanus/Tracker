@@ -1,7 +1,13 @@
 <?xml version="1.0"?>
 
+<?xml-stylesheet href="chrome://rendertracker/content/rendertracker.css"?>
+
 <overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 	
 	<script type="application/x-javascript" src="chrome://rendertracker/content/renderTracker.js"/>
+	
+	<statusbar id="status-bar">
+		<!-- We'll attach our initializer code here -->
+	</statusbar>
 	
 </overlay>

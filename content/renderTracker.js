@@ -1,7 +1,6 @@
 var rendertracker = {
   onLoad: function() {
     // initialization code
-    window.alert("on load!");
   }
 };
 
