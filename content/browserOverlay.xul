@@ -1,14 +1,15 @@
 <?xml version="1.0"?>
 
-<?xml-stylesheet href="chrome://rendertracker/content/rendertracker.css"?>
+<?xml-stylesheet href="chrome://rendertracker/content/rendertracker/rendertracker.css"?>
 
 <overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 	
-	<script type="application/x-javascript" src="chrome://rendertracker/content/netProgress.js"/>
-	<script type="application/x-javascript" src="chrome://rendertracker/content/renderTracker.js"/>
+	<script type="application/x-javascript" src="chrome://rendertracker/content/lib.js"/>
+	<!-- <script type="application/x-javascript" src="chrome://rendertracker/content/rendertracker/netProgress.js"/> -->
+	<script type="application/x-javascript" src="chrome://rendertracker/content/rendertracker/renderTracker.js"/>
 	
 	<statusbar id="status-bar">
-		<!-- We'll attach our initializer in bindings -->
+		<!-- We attach our initializer in bindings and rendertracker.css -->
 	</statusbar>
 	
 </overlay>

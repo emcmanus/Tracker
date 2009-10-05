@@ -7,7 +7,7 @@
 <binding id="initializer">
     <implementation>
         <constructor><![CDATA[
-           renderTracker.initialize(this);
+           RenderTracker.panelBarReady( this );
         ]]></constructor>
     </implementation>
 </binding>

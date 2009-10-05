@@ -1,7 +1,7 @@
 // Ripped from Firebug 1.4, under a BSD license
 // ************************************************************************************************
 
-function NetProgress(context)
+this.NetProgress = function(context)
 {
     this.context = context;
 
@@ -410,7 +410,7 @@ NetProgress.prototype =
 
 // ************************************************************************************************
 
-function NetDocument()
+this.NetDocument = function()
 {
     this.files = [];
 }
@@ -433,7 +433,7 @@ NetDocument.prototype =
 
 // ************************************************************************************************
 
-function NetFile(href, document)
+this.NetFile = function(href, document)
 {
     this.href = href;
     this.document = document
@@ -454,7 +454,7 @@ NetFile.prototype =
 // ************************************************************************************************
 // Local Helpers
 
-function monitorContext(context)
+this.monitorContext = function(context)
 {
     if (!context.netProgress)
     {
@@ -467,7 +467,7 @@ function monitorContext(context)
     }
 }
 
-function unmonitorContext(context)
+this.unmonitorContext = function(context)
 {
     if (context.netProgress)
     {
@@ -485,7 +485,7 @@ function unmonitorContext(context)
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-function initCacheSession()
+this.initCacheSession = function()
 {
     if (!cacheSession)
     {
@@ -495,7 +495,7 @@ function initCacheSession()
     }
 }
 
-function waitForCacheCompletion(request, file, netProgress)
+this.waitForCacheCompletion = function(request, file, netProgress)
 {
     try
     {
@@ -515,7 +515,7 @@ function waitForCacheCompletion(request, file, netProgress)
     }
 }
 
-function getCacheEntry(file, netProgress)
+this.getCacheEntry = function(file, netProgress)
 {
     // Pause first because this is usually called from stopFile, at which point
     // the file's cache entry is locked
@@ -566,14 +566,14 @@ function getCacheEntry(file, netProgress)
     });
 }
 
-function getDateFromSeconds(s)
+this.getDateFromSeconds = function(s)
 {
     var d = new Date();
     d.setTime(s*1000);
     return d;
 }
 
-function getHttpHeaders(request, file)
+this.getHttpHeaders = function(request, file)
 {
     try
     {
@@ -612,7 +612,7 @@ function getHttpHeaders(request, file)
     }
 }
 
-function getRequestWebProgress(request, netProgress)
+this.getRequestWebProgress = function(request, netProgress)
 {
     try
     {
@@ -646,7 +646,7 @@ function getRequestWebProgress(request, netProgress)
     catch (exc) {}
 }
 
-function getRequestCategory(request)
+this.getRequestCategory = function(request)
 {
     try
     {
@@ -659,7 +659,7 @@ function getRequestCategory(request)
     catch (exc) {}
 }
 
-function getRequestElement(request)
+this.getRequestElement = function(request)
 {
     if (request instanceof imgIRequest)
     {
@@ -670,7 +670,7 @@ function getRequestElement(request)
     }
 }
 
-function safeGetWindow(webProgress)
+this.safeGetWindow = function(webProgress)
 {
     try
     {
@@ -682,7 +682,7 @@ function safeGetWindow(webProgress)
     }
 }
 
-function safeGetName(request)
+this.safeGetName = function(request)
 {
     try
     {
@@ -694,7 +694,7 @@ function safeGetName(request)
     }
 }
 
-function getFileCategory(file)
+this.getFileCategory = function(file)
 {
     if (file.category)
         return file.category;
@@ -709,7 +709,7 @@ function getFileCategory(file)
     return (file.category = mimeCategoryMap[file.mimeType]);
 }
 
-function getMimeType(request)
+this.getMimeType = function(request)
 {
     var mimeType = request.contentType;
     if (!mimeType || !(mimeType in mimeCategoryMap))
@@ -729,12 +729,12 @@ function getMimeType(request)
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-function now()
+this.now = function()
 {
     return (new Date()).getTime();
 }
 
-function getFrameLevel(win)
+this.getFrameLevel = function(win)
 {
     var level = 0;
 
