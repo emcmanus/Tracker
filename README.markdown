@@ -17,6 +17,6 @@ Locate your profile folder and beneath it the profile you want to work with (e.g
 
 Open the extensions/ folder, creating it if need be.
 
-Create a new text file called `rendertracker@rendertracker.com` and put the full path to this repo inside.
+Create a new text file called `rendertracker@ed.mcmanus` and put the full path to this repo, with trailing slash, inside.
 
 Restart Firefox.

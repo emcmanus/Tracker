@@ -2,7 +2,8 @@ RenderTracker.ns( function(){ with(RenderTracker) {
 
 
 // Declarations
-this.log = [];
+this.netProgressListener = new NetProgress();
+
 
 this.panelBarReady = function( panelBar )
 {
@@ -17,16 +18,14 @@ this.initialize = function()
 
 this.addHooks = function()
 {
-	// Add observer
-	gBrowser.selectedBrowser.addProgressListener( this.progressListener, NOTIFY_ALL );
-	
-	// Clear log
-	this.log = [];
+	// Add observers
+	this.monitorBrowser( gBrowser.selectedBrowser, this.netProgressListener );
 	
 	// Load new page
 	gBrowser.selectedBrowser.contentWindow.location.href = "http://news.ycombinator.com/";
 }
 
+/*
 this.progressListener = 
 {
 	onStateChange: function(progress, request, flag, status)
@@ -72,7 +71,7 @@ this.progressListener =
 
         throw Components.results.NS_NOINTERFACE;
     }
-}
+}*/
 
 window.addEventListener("load", function() { addHooks() }, false);
 

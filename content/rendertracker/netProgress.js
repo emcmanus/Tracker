@@ -1,49 +1,22 @@
-// Ripped from Firebug 1.4, under a BSD license
-// ************************************************************************************************
+RenderTracker.ns( function(){ with(RenderTracker) {
 
-this.NetProgress = function(context)
+this.debugLog = [];
+
+this.log = function(msg)
 {
-    this.context = context;
+	this.debugLog.push(msg);
+}
 
-    var queue = null;
-    var panel = null;
+// emcmanus mod
+this.NetProgress = function()//context)
+{
+    // this.context = context;
 
     this.post = function(handler, args)
     {
-        if (panel)
-        {
-            var file = handler.apply(this, args);
-            if (file)
-            {
-                 panel.updateFile(file);
-                return file;
-            }
-        }
-        else
-        {
-            if (queue.length/2 >= maxQueueRequests)
-                queue.splice(0, 2);
-            queue.push(handler, args);
-        }
-    };
-
-    this.flush = function()
-    {
-        for (var i = 0; i < queue.length; i += 2)
-        {
-            var file = queue[i].apply(this, queue[i+1]);
-            if (file)
-                panel.updateFile(file);
-        }
-
-        queue = [];
-    };
-
-    this.activate = function(activePanel)
-    {
-        this.panel = panel = activePanel;
-        if (panel)
-            this.flush();
+		// emcmanus mod
+		var file = handler.apply(this, args);
+		return file;
     };
 
     this.update = function(file)
@@ -51,31 +24,15 @@ this.NetProgress = function(context)
         if (panel)
             panel.updateFile(file);
     };
-
-    this.clear = function()
-    {
-        this.requests = [];
-        this.requestMap = {};
-        this.files = [];
-        this.phases = [];
-        this.documents = [];
-        this.windows = [];
-
-        queue = [];
-    };
-
-    this.clear();
 }
 
 NetProgress.prototype =
 {
-    panel: null,
-
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+    // ------------------------------------------------------
 
     respondedTopWindow: function(request, time, webProgress)
     {
-        var win = webProgress ? safeGetWindow(webProgress) : null;
+		var win = webProgress ? safeGetWindow(webProgress) : null;
         this.requestedFile(request, time, win);
         return this.respondedFile(request, time);
     },
@@ -387,17 +344,24 @@ NetProgress.prototype =
         {
             var win = progress.DOMWindow;
             if (win == win.parent)
+			{
+				this.log("calling respondedTopWindow");
                 this.post(respondedTopWindow, [request, now(), progress]);
+			}
         }
         else if (flag & STATE_STOP && flag & STATE_IS_REQUEST)
         {
             if (this.getRequestFile(request))
+			{
+				this.log("calling stopFile");
                 this.post(stopFile, [request, now()]);
+			}
         }
     },
 
     onProgressChange : function(progress, request, current, max, total, maxTotal)
     {
+		this.log("calling progressFile");
         this.post(progressFile, [request, current, max]);
     },
 
@@ -454,32 +418,29 @@ NetFile.prototype =
 // ************************************************************************************************
 // Local Helpers
 
-this.monitorContext = function(context)
+this.monitorBrowser = function(browser, listener)	// emcmanus mod # this.monitorContext
 {
-    if (!context.netProgress)
+    if (browser && listener)
     {
-        var listener = context.netProgress = new NetProgress(context);
+        // var listener = new NetProgress(context);
 
-        context.browser.addProgressListener(listener, NOTIFY_ALL);
-
+        browser.addProgressListener(listener, NOTIFY_ALL);
+		
         observerService.addObserver(listener, "http-on-modify-request", false);
         observerService.addObserver(listener, "http-on-examine-response", false);
     }
 }
 
-this.unmonitorContext = function(context)
+this.unmonitorBrowser = function(browser, listener) // emcmanus mod
 {
-    if (context.netProgress)
+    if (browser && listener)
     {
-        if (context.browser.docShell)
-            context.browser.removeProgressListener(context.netProgress, NOTIFY_ALL);
+        browser.removeProgressListener(listener, NOTIFY_ALL);
 
         // XXXjoe We also want to do this when the context is hidden, so that
         // background files are only logged in the currently visible context
         observerService.removeObserver(context.netProgress, "http-on-modify-request", false);
         observerService.removeObserver(context.netProgress, "http-on-examine-response", false);
-
-        delete context.netProgress;
     }
 }
 
@@ -745,3 +706,6 @@ this.getFrameLevel = function(win)
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+}});	// RenderTracker.ns
