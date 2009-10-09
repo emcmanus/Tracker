@@ -4,8 +4,6 @@
 
 <overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 	
-	<script type="application/x-javascript" src="chrome://rendertracker/content/lib.js"/>
-	<!-- <script type="application/x-javascript" src="chrome://rendertracker/content/rendertracker/netProgress.js"/> -->
 	<script type="application/x-javascript" src="chrome://rendertracker/content/rendertracker/renderTracker.js"/>
 	
 	<statusbar id="status-bar">
