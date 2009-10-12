@@ -1,0 +1,16 @@
+Disable ALL updates. Firefox starts up with unexpected behavior (multiple tabs, temp start pages etc.)
+
+NEVER save tabs when quitting
+
+If possible, limit the number of tabs to 1
+
+ALWAYS disable cache
+
+How to handle pop-ups?
+
+On quiting, firefox asks if you'd like to save your tabs (force quit in the plugin?)
+
+Make homepage default to about:blank (?)
+
+
+

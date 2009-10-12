@@ -69,23 +69,50 @@ var progressListener;
 
 var cacheSession = null;
 
-var alreadyAlerted = false;
 
 /****************************************************************************************************************
  * Global Constants
  */
 
-const nsIWebProgressListener = CI("nsIWebProgressListener")
-const nsIWebProgress = CI("nsIWebProgress")
-const nsIRequest = CI("nsIRequest")
-const nsIChannel = CI("nsIChannel")
-const nsIHttpChannel = CI("nsIHttpChannel")
-const nsICacheService = CI("nsICacheService")
-const nsICache = CI("nsICache")
-const nsIObserverService = CI("nsIObserverService")
-const nsISupportsWeakReference = CI("nsISupportsWeakReference")
-const nsISupports = CI("nsISupports")
-const nsIIOService = CI("nsIIOService")
+// Settings
+const ALLOW_CACHE = false;
+const ALLOW_POPUPS = false;
+const ALLOW_REDIRECTS = false;
+const ALLOW_CONTENT_REFRESHES = false;
+
+// Aliases
+const nsIPrefBranch = CI("nsIPrefBranch");
+const nsIPrefBranch2 = CI("nsIPrefBranch2");
+const nsIPermissionManager = CI("nsIPermissionManager");
+const nsIFireBugClient = CI("nsIFireBugClient");
+const nsISupports = CI("nsISupports");
+const nsIFile = CI("nsIFile");
+const nsILocalFile = CI("nsILocalFile");
+const nsISafeOutputStream = CI("nsISafeOutputStream");
+const nsIURI = CI("nsIURI");
+
+const PrefService = CC("@mozilla.org/preferences-service;1");
+const PermManager = CC("@mozilla.org/permissionmanager;1");
+const DirService =  CCSV("@mozilla.org/file/directory_service;1", "nsIDirectoryServiceProvider");
+
+const prefs = PrefService.getService(nsIPrefBranch2);
+const pm = PermManager.getService(nsIPermissionManager);
+
+const DENY_ACTION = nsIPermissionManager.DENY_ACTION;
+const ALLOW_ACTION = nsIPermissionManager.ALLOW_ACTION;
+
+const nsIWebProgressListener = CI("nsIWebProgressListener");
+const nsIWebNavigation = CI("nsIWebNavigation");
+const nsIWebProgress = CI("nsIWebProgress");
+const nsIRequest = CI("nsIRequest");
+const nsIChannel = CI("nsIChannel");
+const nsIHttpChannel = CI("nsIHttpChannel");
+const nsICacheService = CI("nsICacheService");
+const nsICache = CI("nsICache");
+const nsIObserverService = CI("nsIObserverService");
+const nsISupportsWeakReference = CI("nsISupportsWeakReference");
+const nsISupports = CI("nsISupports");
+const nsIIOService = CI("nsIIOService");
 const imgIRequest = CI("imgIRequest");
 
 const CacheService = CC("@mozilla.org/network/cache-service;1");
@@ -93,6 +120,8 @@ const ImgCache = CC("@mozilla.org/image/cache;1");
 const IOService = CC("@mozilla.org/network/io-service;1");
 
 const NOTIFY_ALL = nsIWebProgress.NOTIFY_ALL;
+
+const STOP_ALL = nsIWebNavigation.STOP_ALL;
 
 const STATE_IS_WINDOW = nsIWebProgressListener.STATE_IS_WINDOW;
 const STATE_IS_DOCUMENT = nsIWebProgressListener.STATE_IS_DOCUMENT;
@@ -106,6 +135,10 @@ const STATE_TRANSFERRING = nsIWebProgressListener.STATE_TRANSFERRING;
 const LOAD_BACKGROUND = nsIRequest.LOAD_BACKGROUND;
 const LOAD_FROM_CACHE = nsIRequest.LOAD_FROM_CACHE;
 const LOAD_DOCUMENT_URI = nsIChannel.LOAD_DOCUMENT_URI;
+
+const LOAD_FLAGS_BYPASS_PROXY = nsIWebNavigation.LOAD_FLAGS_BYPASS_PROXY;
+const LOAD_FLAGS_BYPASS_CACHE = nsIWebNavigation.LOAD_FLAGS_BYPASS_CACHE;
+const LOAD_FLAGS_NONE = nsIWebNavigation.LOAD_FLAGS_NONE;
 
 const ACCESS_READ = nsICache.ACCESS_READ;
 const STORE_ANYWHERE = nsICache.STORE_ANYWHERE;
@@ -132,7 +165,19 @@ const maxQueueRequests = 50
 _Tracker.initialize = function()
 {
 	// Add Hooks
-	window.addEventListener("load", function(){ addEventHooks(); }, false);
+	window.addEventListener("load", function(){ onWindowLoad(); }, false);
+}
+
+_Tracker.updateMessages = [];
+_Tracker.flushUpdates = function()
+{
+	return _Tracker.updateMessages.join("\n");
+}
+
+_Tracker.logMessages = [];
+_Tracker.flush = function()
+{
+	return _Tracker.logMessages.join("\n");
 }
 
 
@@ -140,16 +185,169 @@ _Tracker.initialize = function()
  * Private
  */
 
-var addEventHooks = function()
+var onWindowLoad = function()
 {
-	var context =
+	// IMMEDIATELY stop load
+	gBrowser.selectedBrowser.webNavigation.stop( STOP_ALL );
+	
+	initialConfig();
+	addEventHooks();
+	
+	// Load target page
+	gBrowser.selectedBrowser.contentWindow.location.href = "http://news.ycombinator.com/";
+}
+
+var initialConfig = function()
+{
+	// Force our settings
+	
+	prefs.setBoolPref("browser.cache.disk.enable", ALLOW_CACHE); // cache
+	prefs.setBoolPref("browser.cache.memory.enable", ALLOW_CACHE); // cache
+	prefs.setBoolPref( "browser.accept.redirects", ALLOW_REDIRECTS ); // redirects
+	prefs.setBoolPref( "browser.accept.refreshes", ALLOW_CONTENT_REFRESHES ); // content refresh
+	
+	if ( !ALLOW_POPUPS )
 	{
-		window: window,
-		browser: gBrowser.selectedBrowser
+		prefs.user_pref( "capability.policy.default.windowinternal.open", "noAccess" );
+	}
+}
+
+var addEventHooks = function()
+{	
+	var context = createContext();
+	
+	// Add Listeners
+	progressListener = new ProgressListener( context );
+	
+	gBrowser.selectedBrowser.addProgressListener( progressListener, NOTIFY_ALL );
+	
+	observerService.addObserver(progressListener, "http-on-modify-request", false);
+    observerService.addObserver(progressListener, "http-on-examine-response", false);
+}
+
+function createContext()
+{
+	var context = {
+		window: gBrowser.selectedBrowser.contentWindow,
+		browser: gBrowser.selectedBrowser,
+	    setTimeout: function()
+	    {
+	        var timeout = setTimeout.apply(top, arguments);
+
+	        if (!this.timeouts)
+	            this.timeouts = {};
+
+	        this.timeouts[timeout] = 1;
+
+	        return timeout;
+	    },
+
+	    clearTimeout: function(timeout)
+	    {
+	        clearTimeout(timeout);
+
+	        if (this.timeouts)
+	            delete this.timeouts[timeout];
+	    },
+
+	    setInterval: function()
+	    {
+	        var timeout = setInterval.apply(top, arguments);
+
+	        if (!this.intervals)
+	            this.intervals = {};
+
+	        this.intervals[timeout] = 1;
+
+	        return timeout;
+	    },
+
+	    clearInterval: function(timeout)
+	    {
+	        clearInterval(timeout);
+
+	        if (this.intervals)
+	            delete this.intervals[timeout];
+	    },
+
+	    delay: function(message, object)
+	    {
+	        this.throttle(message, object, null, true);
+	    },
+
+	    throttle: function(message, object, args, forceDelay)
+	    {
+	        if (!this.throttleInit)
+	        {
+	            this.throttleBuildup = 0;
+	            this.throttleQueue = [];
+	            this.throttleTimeout = 0;
+	            this.lastMessageTime = 0;
+	            this.throttleInit = true;
+	        }
+
+	        if (!forceDelay)
+	        {
+	            if (!Firebug.throttleMessages)
+	            {
+	                message.apply(object, args);
+	                return false;
+	            }
+
+	            // Count how many messages have been logged during the throttle period
+	            var logTime = new Date().getTime();
+	            if (logTime - this.lastMessageTime < throttleTimeWindow)
+	                ++this.throttleBuildup;
+	            else
+	                this.throttleBuildup = 0;
+
+	            this.lastMessageTime = logTime;
+
+	            // If the throttle limit has been passed, enqueue the message to be logged later on a timer,
+	            // otherwise just execute it now
+	            if (!this.throttleQueue.length && this.throttleBuildup <= throttleMessageLimit)
+	            {
+	                message.apply(object, args);
+	                return false;
+	            }
+	        }
+
+	        this.throttleQueue.push(message, object, args);
+
+	        if (this.throttleTimeout)
+	            this.clearTimeout(this.throttleTimeout);
+
+	        var self = this;
+	        this.throttleTimeout =
+	            this.setTimeout(function() { self.flushThrottleQueue(); }, throttleInterval);
+	        return true;
+	    },
+
+	    flushThrottleQueue: function()
+	    {
+	        var queue = this.throttleQueue;
+
+	        var max = throttleFlushCount * 3;
+	        if (max > queue.length)
+	            max = queue.length;
+
+	        for (var i = 0; i < max; i += 3)
+	            queue[i].apply(queue[i+1], queue[i+2]);
+
+	        queue.splice(0, throttleFlushCount*3);
+
+	        if (queue.length)
+	        {
+	            var self = this;
+	            this.throttleTimeout =
+	                this.setTimeout(function f() { self.flushThrottleQueue(); }, throttleInterval);
+	        }
+	        else
+	            this.throttleTimeout = 0;
+	    }
 	}
 	
-	progressListener = new ProgressListener( context );
-	gBrowser.selectedBrowser.addProgressListener( progressListener, NOTIFY_ALL );
+	return context;
 }
 
 function initCacheSession()
@@ -183,7 +381,10 @@ function waitForCacheCompletion(request, file, netProgress)
 }
 
 function getCacheEntry(file, netProgress)
-{
+{	
+	// Because we are bypassing the cache for all requests, we should never call this function.
+	// It just updates the file properties in the event an asset is fetched from the cache - ed
+	
     // Pause first because this is usually called from stopFile, at which point
     // the file's cache entry is locked
     setTimeout(function()
@@ -455,6 +656,8 @@ NetFile.prototype =
 
 function ProgressListener( context )
 {
+	var queue = null;
+	
 	this.context = context;
 	
     this.post = function(handler, args)
@@ -464,7 +667,7 @@ function ProgressListener( context )
             var file = handler.apply(this, args);
             if (file)
             {
-                 panel.updateFile(file);
+				this.customUpdateFile(file);
                 return file;
             }
         // }
@@ -495,10 +698,15 @@ function ProgressListener( context )
             this.flush();
     };
 
+	this.customUpdateFile = function(file)
+	{
+		// IMPLEMENT OUR RECORDING HERE!
+		_Tracker.updateMessages.push("href: " + file.href + ",\tstart: " + file.startTime + ",\tend: " + file.endTime);
+	};
+
     this.update = function(file)
     {
-        if (panel)
-            panel.updateFile(file);
+		this.customUpdateFile(file);
     };
 
     this.clear = function()
@@ -523,6 +731,7 @@ ProgressListener.prototype =
 	respondedTopWindow: function(request, time, webProgress)
     {
         var win = webProgress ? safeGetWindow(webProgress) : null;
+		_Tracker.logMessages.push("\nin respondedTopWindow, win = " + win);	// Let's track code paths to see which calls are contributing null win's
         this.requestedFile(request, time, win);
         return this.respondedFile(request, time);
     },
@@ -531,6 +740,7 @@ ProgressListener.prototype =
     { 	// XXXjjb 3rd arg was webProgress, pulled safeGetWindow up
         // XXXjjb to allow spy to pass win. 
 		// var win = webProgress ? safeGetWindow(webProgress) : null;
+		_Tracker.logMessages.push("in requestedFile (calling with win), win = " + win);	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request, win);
         if (file)
         {
@@ -553,6 +763,7 @@ ProgressListener.prototype =
 
     respondedFile: function(request, time)
     {
+		_Tracker.logMessages.push("\nin respondedFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request);
         if (file)
         {
@@ -586,6 +797,7 @@ ProgressListener.prototype =
 
     progressFile: function(request, progress, expectedSize)
     {
+		_Tracker.logMessages.push("\nin progressFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request);
         if (file)
         {
@@ -600,6 +812,7 @@ ProgressListener.prototype =
 
     stopFile: function(request, time, postText, responseText)
     {
+		_Tracker.logMessages.push("\nin stopFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request);
         if (file)
         {
@@ -614,8 +827,11 @@ ProgressListener.prototype =
 
             this.arriveFile(file, request);
             this.endLoad(file);
-
-            getCacheEntry(file, this);
+			
+			if (ALLOW_CACHE) // making caching optional - ed
+			{
+	            getCacheEntry(file, this);
+			}
 
             return file;
         }
@@ -639,27 +855,38 @@ ProgressListener.prototype =
 
     getRequestFile: function(request, win)
     {
+		_Tracker.logMessages.push("entered getRequestFile");
+		
         var name = safeGetName(request);
         if (!name || reIgnore.exec(name))
+		{
+			_Tracker.logMessages.push("exit, no name or ignore name: " + (name || "") + "\n");
             return null;
+		}
 
         var index = this.requests.indexOf(request);
         if (index == -1)
         {
+			_Tracker.logMessages.push("could not find matching request");
             var file = this.requestMap[name];
             if (file)
+			{
+				_Tracker.logMessages.push("RETURNING FILE, even though there was no associated request. name: " + name + "\n");
                 return file;
-
+			}
+			
+			// FOLLOWING COND IS DEBUG
+			if (!this.context)
+			{
+				_Tracker.logMessages.push("this.context is NULL");
+			}
+			
             if (!win || getRootWindow(win) != this.context.window)
 			{
-				if (!alreadyAlerted)
-				{
-					alert(getRootWindow(win));
-					alreadyAlerted = true;
-				}
+				_Tracker.logMessages.push("could not find file. early EXIT. no window, or event from incorrect window. request name: " + name + "\n");
 				return;
 			}
-
+			
             var fileDoc = this.getRequestDocument(win);
             var isDocument = request.loadFlags & LOAD_DOCUMENT_URI && fileDoc.parent;
             var doc = isDocument ? fileDoc.parent : fileDoc;
@@ -681,11 +908,15 @@ ProgressListener.prototype =
             this.requestMap[name] = file;
             this.requests.push(request);
             this.files.push(file);
-
+			
+			_Tracker.logMessages.push("Adding new file to requests. RETURNING NEW FILE, name: " + name);
             return file;
         }
         else
+		{
+			_Tracker.logMessages.push("existing file, existing request. RETURNING FILE, name: " + name + " \n");
             return this.files[index];
+		}
     },
 
     getRequestDocument: function(win)
@@ -847,6 +1078,7 @@ ProgressListener.prototype =
         }
         else if (flag & STATE_STOP && flag & STATE_IS_REQUEST)
         {
+			_Tracker.logMessages.push("\nin onStateChange STATE_STOP branch, calling getRequestFile with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
             if (this.getRequestFile(request))
                 this.post(this.stopFile, [request, now()]);
         }
@@ -934,6 +1166,35 @@ const binaryCategoryMap =
     "image": 1,
     "flash" : 1
 };
+
+
+/****************************************************************************************************************
+ * Local Utils
+ */
+
+function $(id, doc)
+{
+    if (doc)
+        return doc.getElementById(id);
+    else
+        return document.getElementById(id);
+}
+
+function cloneArray(array, fn)
+{
+   var newArray = [];
+
+   for (var i = 0; i < array.length; ++i)
+       newArray.push(array[i]);
+
+   return newArray;
+}
+
+function bindFixed()
+{
+    var args = cloneArray(arguments), fn = args.shift(), object = args.shift();
+    return function() { return fn.apply(object, args); }
+}
 
 
 }}).apply({});

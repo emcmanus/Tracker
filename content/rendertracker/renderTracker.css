@@ -1,3 +1,0 @@
-#status-bar {
-	x-moz-binding: url("chrome://rendertracker/content/bindings.xml#initializer");
-}
