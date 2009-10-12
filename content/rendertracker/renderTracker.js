@@ -208,8 +208,40 @@ var initialConfig = function()
 	
 	if ( !ALLOW_POPUPS )
 	{
-		prefs.user_pref( "capability.policy.default.windowinternal.open", "noAccess" );
+		prefs.setCharPref( "capability.policy.default.windowinternal.open", "noAccess" );
 	}
+	
+	// Startup page
+	prefs.setCharPref( "browser.startup.homepage", "about:blank" ); // Default home page
+	prefs.setIntPref( "browser.startup.homepage.count", 1 ); // Num tabs on startup
+	prefs.setIntPref( "browser.startup.page", 0 ); // Blank start page - should override browser.startup.homepage
+	prefs.setIntPref( "browser.tabs.loadOnNewTab", 0 ); // New tabs load about:blank
+	prefs.setIntPref( "browser.windows.loadOnNewWindow", 0 ); // New windows load about:blank
+	prefs.setBoolPref( "browser.update.resetHomepage", false ); // Do not reset homepage on update
+	
+	// Warnings
+	prefs.setBoolPref( "browser.tabs.warnOnClose", false ); // Do not warn about multiple tabs when quiting
+	prefs.setBoolPref( "browser.tabs.warnOnCloseOther", false ); // Do not warn about other tabs on "close other tabs"
+	
+	// Updates - Extensions
+	prefs.setBoolPref( "extensions.checkCompatibility", false ); // Do not check extension compatability on upgrade
+	prefs.setBoolPref( "extensions.checkUpdateSecurity", false ); // Do not check for secure updates
+	prefs.setBoolPref( "extensions.update.autoUpdate", false ); // Automatically install extension updates
+	prefs.setBoolPref( "extensions.update.autoUpdateEnabled", false ); // Disable extension update checking
+	prefs.setBoolPref( "extensions.update.enabled", false ); // Do not check for updates
+	prefs.setBoolPref( "extensions.update.notifyUser", false ); // Never notify the user of available updates
+	
+	// Updates - Browser
+	prefs.setBoolPref( "app.update.enabled", false ); // Master pref
+	prefs.setBoolPref( "update_notifications.enabled", false ); // Never notify the user of available updates
+	prefs.setIntPref( "update_notifications.provider.0.frequency", 18250 ); // Check for updates every 50 years (in days)
+	prefs.setIntPref( "update.interval", 1572480000000 ); // Check for updates every 50 years
+	
+	// Updating - Other
+	prefs.setBoolPref( "browser.search.update", false ); // Do not check for search plugin updates
+	
+	// Microsummaries
+	prefs.setBoolPref( "browser.microsummary.enabled", false ); // Disable microsummary updates
 }
 
 var addEventHooks = function()
