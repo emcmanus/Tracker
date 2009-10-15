@@ -1,58 +1,3 @@
-// Namespaces
-var _Tracker = function(){};
-var _TrackerLib = function(){};
-
-
-
-/**************************************
-	Library
-**************************************/
-
-(function(){
-	
-	var _CI = Components.interfaces;
-	var _CC = Components.classes;
-
-	this.CC = function(cName)
-	{
-	    return _CC[cName];
-	};
-
-	this.CI = function(ifaceName)
-	{
-	    return _CI[ifaceName];
-	};
-
-	this.CCSV = function(cName, ifaceName)
-	{
-	    return _CC[cName].getService(_CI[ifaceName]);
-	};
-
-	this.CCIN = function(cName, ifaceName)
-	{
-	    return _CC[cName].createInstance(_CI[ifaceName]);
-	};
-
-	this.QI = function(obj, iface)
-	{
-	    return obj.QueryInterface(iface);
-	};
-	
-	//  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *
-	
-	this.getRootWindow = function(win)
-	{
-	    for (; win; win = win.parent)
-	    {
-	        if (!win.parent || win == win.parent)
-	            return win;
-	    }
-	    return null;
-	};
-	
-}).apply(_TrackerLib);
-
-
 
 /**************************************
 	Tracker Implementation
@@ -80,12 +25,15 @@ const ALLOW_POPUPS = false;
 const ALLOW_REDIRECTS = false;
 const ALLOW_CONTENT_REFRESHES = false;
 
+const THROTTLE_MESSAGES = false;
+const COLLECT_HTTP_HEADERS = true;
+
+const DEFER_HEADER_COLLECTION = true;
+
 // Aliases
 const nsIPrefBranch = CI("nsIPrefBranch");
 const nsIPrefBranch2 = CI("nsIPrefBranch2");
 const nsIPermissionManager = CI("nsIPermissionManager");
-const nsIFireBugClient = CI("nsIFireBugClient");
-const nsISupports = CI("nsISupports");
 const nsIFile = CI("nsIFile");
 const nsILocalFile = CI("nsILocalFile");
 const nsISafeOutputStream = CI("nsISafeOutputStream");
@@ -180,6 +128,51 @@ _Tracker.flush = function()
 	return _Tracker.logMessages.join("\n");
 }
 
+_Tracker.finished = function()
+{
+	// Quit the app!
+	var Application = Components.classes["@mozilla.org/fuel/application;1"].getService(Components.interfaces.fuelIApplication);
+	Application.quit();
+}
+
+
+_Tracker.progressListener = null;	// Ref to most recent progressListener
+_Tracker.printFiles = function()
+{
+	// var report = "";
+	var dest;
+	var curFile = null;
+	
+	// Build Report Object
+	var report = {};
+	
+	for ( var i=0; i<_Tracker.progressListener.files.length; i++ )
+	{
+		curFile = _Tracker.progressListener.files[i];
+		
+		dest = report[i] = {};
+		
+		for ( var property in curFile )
+		{
+			if (property)
+				if (property=="requestHeaders" || property=="responseHeaders")
+					dest[property] = curFile[property];
+				else
+					// Make sure we're not copying any pointers
+					if ( typeof curFile[property] != 'function' && typeof curFile[property] != 'object' )
+						dest[property] = curFile[property];
+		}
+	}
+	
+	var reportString = serialize(report);
+	
+	var fileOut = FileIO.open('/Users/edmcmanus/Code/quicker/tracker/reports/test_out.json');
+	
+	FileIO.write(fileOut, reportString);
+	
+	_Tracker.finished();
+}
+
 
 /****************************************************************************************************************
  * Private
@@ -194,7 +187,10 @@ var onWindowLoad = function()
 	addEventHooks();
 	
 	// Load target page
-	gBrowser.selectedBrowser.contentWindow.location.href = "http://news.ycombinator.com/";
+	gBrowser.selectedBrowser.contentWindow.location.href = "http://www.google.com/";
+	
+	// Print report and exit
+	setTimeout( function(){_Tracker.printFiles();}, 5000 );
 }
 
 var initialConfig = function()
@@ -249,7 +245,9 @@ var addEventHooks = function()
 	var context = createContext();
 	
 	// Add Listeners
-	progressListener = new ProgressListener( context );
+	_Tracker.progressListener = progressListener = new ProgressListener( context );
+	
+	context.progressListener = progressListener;
 	
 	gBrowser.selectedBrowser.addProgressListener( progressListener, NOTIFY_ALL );
 	
@@ -259,9 +257,12 @@ var addEventHooks = function()
 
 function createContext()
 {
-	var context = {
+	var context =
+	{
 		window: gBrowser.selectedBrowser.contentWindow,
+		
 		browser: gBrowser.selectedBrowser,
+		
 	    setTimeout: function()
 	    {
 	        var timeout = setTimeout.apply(top, arguments);
@@ -320,7 +321,7 @@ function createContext()
 
 	        if (!forceDelay)
 	        {
-	            if (!Firebug.throttleMessages)
+	            if (THROTTLE_MESSAGES)
 	            {
 	                message.apply(object, args);
 	                return false;
@@ -406,8 +407,10 @@ function waitForCacheCompletion(request, file, netProgress)
         if (exc.result != NS_ERROR_CACHE_WAIT_FOR_VALIDATION
             && exc.result != NS_ERROR_CACHE_KEY_NOT_FOUND)
         {
-            ERROR(exc);
-            netProgress.post(cacheEntryReady, [request, file, -1]);
+			if ( ALLOW_CACHE ) // we always enter this block when caching is disabled - ed
+            	ERROR(exc);
+			
+            netProgress.post(netProgress.cacheEntryReady, [request, file, -1]);
         }
     }
 }
@@ -461,9 +464,45 @@ function getCacheEntry(file, netProgress)
         }
         catch (exc)
         {
-            ERROR(exc);
+			if ( ALLOW_CACHE )	// we'll always enter this block when caching is disabled - ed 
+            	ERROR(exc);
         }
     });
+}
+
+function inspect(obj, maxRecurs, level)
+{
+	if (level > maxRecurs)
+	{
+		return;
+	}
+	
+	var type, str = "";
+	
+	function getTabs(v)
+	{
+		var s = "";
+		for (var i=0; i<v; i++) s += "  ";
+		return s;
+	}
+	
+	level = level || 0;
+	
+	for( var property in obj )
+	{
+		try
+		{
+			type = typeof( obj[property] );
+			
+			if ( type == 'object' )
+				str += getTabs(level) + property + ":\n" + inspect( obj[property], maxRecurs, level+1 );
+			else if ( type != 'null' && type != 'function' )
+				str += getTabs(level) + property + ': ' + obj[property] + "\n";
+		}
+		catch(e){}
+	}
+	
+	return str;
 }
 
 function getDateFromSeconds(s)
@@ -476,8 +515,9 @@ function getDateFromSeconds(s)
 function getHttpHeaders(request, file)
 {
     try
-    {
+    {	
         var http = QI(request, nsIHttpChannel);
+		
         file.method = http.requestMethod;
         file.status = request.responseStatus;
         file.urlParams = parseURLParams(file.href);
@@ -486,8 +526,10 @@ function getHttpHeaders(request, file)
             file.mimeType = getMimeType(request);
 
         // Disable temporarily
-        if (!file.responseHeaders && Firebug.collectHttpHeaders)
+        if (!file.responseHeaders && COLLECT_HTTP_HEADERS)
         {
+			_Tracker.logMessages.push("Entered branch");
+			
             var requestHeaders = [], responseHeaders = [];
 
             http.visitRequestHeaders({
@@ -505,10 +547,13 @@ function getHttpHeaders(request, file)
 
             file.requestHeaders = requestHeaders;
             file.responseHeaders = responseHeaders;
+			
+			_Tracker.logMessages.push("should've set headers\n");
         }
     }
     catch (exc)
     {
+		consoleWarning( "Catch. File: " + safeGetName(request) + ", error: " + exc );
     }
 }
 
@@ -733,7 +778,7 @@ function ProgressListener( context )
 	this.customUpdateFile = function(file)
 	{
 		// IMPLEMENT OUR RECORDING HERE!
-		_Tracker.updateMessages.push("href: " + file.href + ",\tstart: " + file.startTime + ",\tend: " + file.endTime);
+		// _Tracker.updateMessages.push("href: " + file.href + ",\tstart: " + file.startTime + ",\tend: " + file.endTime);
 	};
 
     this.update = function(file)
@@ -763,7 +808,7 @@ ProgressListener.prototype =
 	respondedTopWindow: function(request, time, webProgress)
     {
         var win = webProgress ? safeGetWindow(webProgress) : null;
-		_Tracker.logMessages.push("\nin respondedTopWindow, win = " + win);	// Let's track code paths to see which calls are contributing null win's
+		// _Tracker.logMessages.push("\nin respondedTopWindow, win = " + win);	// Let's track code paths to see which calls are contributing null win's
         this.requestedFile(request, time, win);
         return this.respondedFile(request, time);
     },
@@ -772,7 +817,7 @@ ProgressListener.prototype =
     { 	// XXXjjb 3rd arg was webProgress, pulled safeGetWindow up
         // XXXjjb to allow spy to pass win. 
 		// var win = webProgress ? safeGetWindow(webProgress) : null;
-		_Tracker.logMessages.push("in requestedFile (calling with win), win = " + win);	// Let's track code paths to see which calls are contributing null win's
+		// _Tracker.logMessages.push("in requestedFile (calling with win), win = " + win);	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request, win);
         if (file)
         {
@@ -795,7 +840,7 @@ ProgressListener.prototype =
 
     respondedFile: function(request, time)
     {
-		_Tracker.logMessages.push("\nin respondedFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
+		// _Tracker.logMessages.push("\nin respondedFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request);
         if (file)
         {
@@ -811,8 +856,9 @@ ProgressListener.prototype =
                 file.fromCache = true;
             else if (!file.fromCache)
                 file.fromCache = false;
-
-            getHttpHeaders(request, file);
+			
+			// if ( !DEFER_HEADER_COLLECTION )
+            	getHttpHeaders(request, file);
 
             // This is a strange but effective tactic for simulating the
             // load of background images, which we can't actually track.
@@ -829,7 +875,7 @@ ProgressListener.prototype =
 
     progressFile: function(request, progress, expectedSize)
     {
-		_Tracker.logMessages.push("\nin progressFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
+		// _Tracker.logMessages.push("\nin progressFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request);
         if (file)
         {
@@ -844,7 +890,7 @@ ProgressListener.prototype =
 
     stopFile: function(request, time, postText, responseText)
     {
-		_Tracker.logMessages.push("\nin stopFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
+		// _Tracker.logMessages.push("\nin stopFile calling with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
         var file = this.getRequestFile(request);
         if (file)
         {
@@ -860,11 +906,8 @@ ProgressListener.prototype =
             this.arriveFile(file, request);
             this.endLoad(file);
 			
-			if (ALLOW_CACHE) // making caching optional - ed
-			{
-	            getCacheEntry(file, this);
-			}
-
+	        getCacheEntry(file, this);
+			
             return file;
         }
     },
@@ -887,35 +930,35 @@ ProgressListener.prototype =
 
     getRequestFile: function(request, win)
     {
-		_Tracker.logMessages.push("entered getRequestFile");
+		// _Tracker.logMessages.push("entered getRequestFile");
 		
         var name = safeGetName(request);
         if (!name || reIgnore.exec(name))
 		{
-			_Tracker.logMessages.push("exit, no name or ignore name: " + (name || "") + "\n");
+			// _Tracker.logMessages.push("exit, no name or ignore name: " + (name || "") + "\n");
             return null;
 		}
 
         var index = this.requests.indexOf(request);
         if (index == -1)
         {
-			_Tracker.logMessages.push("could not find matching request");
+			// _Tracker.logMessages.push("could not find matching request");
             var file = this.requestMap[name];
             if (file)
 			{
-				_Tracker.logMessages.push("RETURNING FILE, even though there was no associated request. name: " + name + "\n");
+				// _Tracker.logMessages.push("RETURNING FILE, even though there was no associated request. name: " + name + "\n");
                 return file;
 			}
 			
 			// FOLLOWING COND IS DEBUG
 			if (!this.context)
 			{
-				_Tracker.logMessages.push("this.context is NULL");
+				// _Tracker.logMessages.push("this.context is NULL");
 			}
 			
             if (!win || getRootWindow(win) != this.context.window)
 			{
-				_Tracker.logMessages.push("could not find file. early EXIT. no window, or event from incorrect window. request name: " + name + "\n");
+				// _Tracker.logMessages.push("could not find file. early EXIT. no window, or event from incorrect window. request name: " + name + "\n");
 				return;
 			}
 			
@@ -941,12 +984,12 @@ ProgressListener.prototype =
             this.requests.push(request);
             this.files.push(file);
 			
-			_Tracker.logMessages.push("Adding new file to requests. RETURNING NEW FILE, name: " + name);
+			// _Tracker.logMessages.push("Adding new file to requests. RETURNING NEW FILE, name: " + name);
             return file;
         }
         else
 		{
-			_Tracker.logMessages.push("existing file, existing request. RETURNING FILE, name: " + name + " \n");
+			// _Tracker.logMessages.push("existing file, existing request. RETURNING FILE, name: " + name + " \n");
             return this.files[index];
 		}
     },
@@ -1110,7 +1153,7 @@ ProgressListener.prototype =
         }
         else if (flag & STATE_STOP && flag & STATE_IS_REQUEST)
         {
-			_Tracker.logMessages.push("\nin onStateChange STATE_STOP branch, calling getRequestFile with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
+			// _Tracker.logMessages.push("\nin onStateChange STATE_STOP branch, calling getRequestFile with NO WINDOW");	// Let's track code paths to see which calls are contributing null win's
             if (this.getRequestFile(request))
                 this.post(this.stopFile, [request, now()]);
         }
