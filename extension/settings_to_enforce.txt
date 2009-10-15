@@ -1,0 +1,47 @@
+	DONE SO FAR:
+	
+	File printing and closing firefox are stubbed in as methods.
+	
+	I'm pretty sure we can easily do a system call in ruby, which will block until the process exits. But, we'll want
+	to fork that process and kill it if it takes too long to complete (>1 min?).
+	
+	http://whynotwiki.com/Ruby_/_Process_management
+	
+	That will just be a big while true sleep 1000; loop that sits waiting for a new SQS job to be dispatched.
+	
+	We're not going to use Watir or Selenium (or FireDriver or FireWatir) just yet, since they both appear to impact
+	front-end performance significantly.
+
+
+Disable ALL updates. Firefox starts up with unexpected behavior (multiple tabs, temp start pages etc.)
+
+NEVER save tabs when quitting
+
+If possible, limit the number of tabs to 1
+
+ALWAYS disable cache
+
+How to handle pop-ups?
+
+On quiting, firefox asks if you'd like to save your tabs (force quit in the plugin?)
+
+Make homepage default to about:blank (?)
+
+Crash recovery
+browser.sessionstore.enabled = false
+browser.sessionstore.resume_from_crash = false
+
+Disable password save nag:
+signon.rememberSignons = false
+
+Disable Crash Reporter
+You can disable the Mozilla Crash Reporter by opening the "application.ini" file in the installation directory, finding the entry [Crash Reporter] Enabled=1 and changing the 1 to 0 (you will need to repeat the edit if an application update replaces the file).
+
+"Firefox is already running, but is not responding"
+You can not disable this dialog, but you can avoid it by using different profiles and use the "-fxProfile" switch with iimInit.
+
+
+
+REPLACE ALERTS?
+
+Overwrite window.alert, window.confirm, window.prompt in contentWindow with a function that just returns true or false
