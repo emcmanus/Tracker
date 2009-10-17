@@ -34,8 +34,8 @@ function openWindow(aChromeURISpec, aArgument)
 const myAppHandler = {
   
   wrappedJSObject: {
-    targetURI: "",
-    reportPath: ""
+	targetURIs: [],
+    reportPaths: []
   },
   
   /* nsISupports */
@@ -53,46 +53,75 @@ const myAppHandler = {
 
   handle : function clh_handle(cmdLine)
   {
-    try
-	{
-      // -tracker_target [URL]
-      var uristr = cmdLine.handleFlagWithParam("tracker_target", false);
-      if (uristr)
-	  {
-		this.wrappedJSObject.targetURI = uristr;
-		cmdLine.preventDefault = true;
-      }
-	  else
-	  {
-		Components.utils.reportError("Must supply tracker_target as a parameter");
-	  }
-    }
-    catch (e)
-	{
-      Components.utils.reportError("incorrect parameter passed to -tracker_target on the command line.");
-    }
-	
+
+	var uristr, uristrs, deststr, deststrs;
+
+	// Single Job
+
 	try
 	{
-      // -tracker_report_path [path]
-      var deststr = cmdLine.handleFlagWithParam("tracker_report_path", false);
-      if (deststr)
-	  {
-		this.wrappedJSObject.reportPath = deststr;
-		cmdLine.preventDefault = true;
-      }
-	  else
-	  {
-		Components.utils.reportError("Must supply tracker_report_path as a parameter");
-	  }
-    }
-    catch (e)
+		// -tracker_target [URL]
+		uristr = cmdLine.handleFlagWithParam("tracker_target", false);
+		if (uristr)
+		{
+			this.wrappedJSObject.targetURIs.push( uristr );
+			cmdLine.preventDefault = true;
+		}
+	}
+	catch (e)
 	{
-      Components.utils.reportError("incorrect parameter passed to -tracker_report_path on the command line.");
-    }
+		Components.utils.reportError("incorrect parameter passed to -tracker_target on the command line.");
+	}
+
+	try
+	{
+		// -tracker_report_path [path]
+		deststr = cmdLine.handleFlagWithParam("tracker_report_path", false);
+		if (deststr)
+		{
+			this.wrappedJSObject.reportPaths.push( deststr );
+			cmdLine.preventDefault = true;
+		}
+	}
+	catch (e)
+	{
+		Components.utils.reportError("incorrect parameter passed to -tracker_report_path on the command line.");
+	}
+	
+	// Batch
+
+	try
+	{
+		// -tracker_targets [comma-separated paths]
+		uristrs = cmdLine.handleFlagWithParam("tracker_targets", false);
+		if (uristrs)
+		{
+			this.wrappedJSObject.targetURIs = uristrs.split(",");
+			cmdLine.preventDefault = true;
+		}
+	}
+	catch (e)
+	{
+		Components.utils.reportError("incorrect parameter passed to -tracker_targets on the command line.");
+	}
+
+	try
+	{
+		// -tracker_report_paths [comma-separated paths]
+		deststrs = cmdLine.handleFlagWithParam("tracker_report_paths", false);
+		if (deststrs)
+		{
+			this.wrappedJSObject.reportPaths = deststrs.split(",");
+			cmdLine.preventDefault = true;
+		}
+	}
+	catch (e)
+	{
+		Components.utils.reportError("incorrect parameter passed to -tracker_report_paths on the command line.");
+	}
 	
 	// Enter branch when there's a) an error, or b) we've set both vars
-	// if ( (this.wrappedJSObject.reportPath && this.wrappedJSObject.targetURI) )
+	// if ( (this.wrappedJSObject.reportPath && this.wrappedJSObject.targetURIs.length) )
 	// {
 		var blankURI = cmdLine.resolveURI( "about:blank" );
 		openWindow(CHROME_URI, blankURI);

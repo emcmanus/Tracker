@@ -26,10 +26,14 @@ Restart Firefox.
 
 #### Usage ####
 
-The extension looks for two command-line parameters: tracker\_target and tracker\_report_path.
+The extension looks for two command-line parameters: tracker\_target and tracker\_report_path for a single job, or tracker\_targets and tracker\_report\_paths for batch jobs.
 
-Target is the URL to render, output is the location of the log file.
+Target is the URL to render, report path is the location of the log file.
 
-Example:
+Single Job Example:
 
 ./firefox-bin -P "Dev" -tracker\_target "http://google.com" -tracker\_report\_path "/tmp/out.js"
+
+Batch Example:
+
+./firefox-bin -P "Dev" -tracker\_targets "http://news.ycombinator.com,http://google.com" -tracker\_report_paths "/tmp/out1.js,/tmp/out2.js"

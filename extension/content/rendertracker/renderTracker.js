@@ -140,16 +140,18 @@ _Tracker.exit = function()
 	var Application;
 	
 	// Track the number of window openings, if it exceeds our restartLimit kill the app
-	if ( false )
+	// edit: implementing a remote control is more work than it's worth (right now), so instead
+	// we'll let FF run in batch mode, reporting for multiple URL's and then exiting.
+	if ( true )
 	{
 		Application = Components.classes["@mozilla.org/fuel/application;1"].getService(Components.interfaces.fuelIApplication);
 		Application.quit();
 	}
-	else
-	{
-		// Otherwise just close the current window and leave the firefox server running
-		gBrowser.selectedBrowser.contentWindow.close();
-	}
+	// else
+	// {
+	// 	// Otherwise just close the current window and leave the firefox server running
+	// 	gBrowser.selectedBrowser.contentWindow.close();
+	// }
 }
 
 _Tracker.progressListener = null;	// Ref to most recent progressListener
@@ -184,8 +186,7 @@ _Tracker.printFiles = function()
 	
 	writeToReportFile( reportString );
 	
-	// Close window, leave firefox server instance running
-	_Tracker.exit();
+	startNextJob();
 }
 
 
@@ -196,7 +197,10 @@ _Tracker.printFiles = function()
 var writeToReportFile = function( str )
 {
 	if (!logFile)
-		logFile = FileIO.open( trackerService.reportPath );
+	{
+		Components.utils.reportError("Log file not set.");
+		return;
+	}
 	
 	if (logFile)
 		if (!FileIO.write(logFile, str))
@@ -205,27 +209,46 @@ var writeToReportFile = function( str )
 		Components.utils.reportError("Error opening log file.");
 }
 
+var startNextJob = function()
+{
+	if ( trackerService.targetURIs.length )
+	{
+		// Set log file target
+		logFile = FileIO.open( trackerService.reportPaths.pop() );
+		
+		// Load target page
+		gBrowser.selectedBrowser.contentWindow.location.href = trackerService.targetURIs.pop();
+		
+		// Print report and exit
+		setTimeout( function(){_Tracker.printFiles();}, 5000 );
+	}
+	else
+	{
+		_Tracker.exit();
+	}
+}
+
 var onWindowLoad = function()
 {
 	// IMMEDIATELY stop load
 	gBrowser.selectedBrowser.webNavigation.stop( STOP_ALL );
 	
-	
 	// Setup check
-	if ( typeof trackerService.reportPath == "undefined" || typeof trackerService.targetURI == "undefined" )
+	if ( trackerService.reportPaths.length == 0 || trackerService.targetURIs.length == 0 )
 	{
-		Components.utils.reportError("Did not supply appropriate command-line parameters -tracker_report_path and/or -tracker_target");
+		Components.utils.reportError("Did not supply appropriate command-line parameters.");
+		return;
+	}
+	if ( trackerService.reportPaths.length != trackerService.targetURIs.length )
+	{
+		Components.utils.reportError("Number of supplied report paths must equal number of targets.");
 		return;
 	}
 	
 	initialConfig();
 	addEventHooks();
 	
-	// Load target page
-	gBrowser.selectedBrowser.contentWindow.location.href = trackerService.targetURI;
-	
-	// Print report and exit
-	setTimeout( function(){_Tracker.printFiles();}, 5000 );
+	startNextJob();
 }
 
 var initialConfig = function()
@@ -812,7 +835,6 @@ function ProgressListener( context )
 
 	this.customUpdateFile = function(file)
 	{
-		// IMPLEMENT OUR RECORDING HERE!
 		// _Tracker.updateMessages.push("href: " + file.href + ",\tstart: " + file.startTime + ",\tend: " + file.endTime);
 	};
 
