@@ -32,6 +32,8 @@ const COLLECT_HTTP_HEADERS = true;
 
 const DEFER_HEADER_COLLECTION = true;
 
+const TIKHON_SUCKS = true;
+
 // Aliases
 const nsIPrefBranch = CI("nsIPrefBranch");
 const nsIPrefBranch2 = CI("nsIPrefBranch2");
@@ -135,9 +137,19 @@ _Tracker.flush = function()
 
 _Tracker.exit = function()
 {
-	// Quit the app!
-	var Application = Components.classes["@mozilla.org/fuel/application;1"].getService(Components.interfaces.fuelIApplication);
-	Application.quit();
+	var Application;
+	
+	// Track the number of window openings, if it exceeds our restartLimit kill the app
+	if ( false )
+	{
+		Application = Components.classes["@mozilla.org/fuel/application;1"].getService(Components.interfaces.fuelIApplication);
+		Application.quit();
+	}
+	else
+	{
+		// Otherwise just close the current window and leave the firefox server running
+		gBrowser.selectedBrowser.contentWindow.close();
+	}
 }
 
 _Tracker.progressListener = null;	// Ref to most recent progressListener
@@ -172,7 +184,7 @@ _Tracker.printFiles = function()
 	
 	writeToReportFile( reportString );
 	
-	// Exit
+	// Close window, leave firefox server instance running
 	_Tracker.exit();
 }
 

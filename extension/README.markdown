@@ -19,14 +19,14 @@ Open the extensions/ folder, creating it if needed.
 
 Create a new text file called `rendertracker@ed.mcmanus` and put the full path to this repo, with trailing slash, inside.
 
-Next, delete your compreg.dat file to force Firefox to rebuilt its component list.
+Next, delete your compreg.dat file to force Firefox to rebuild its component list.
 
 Restart Firefox.
 
 
 #### Usage ####
 
-The extension looks for two command-line parameters: rendertracker\_target and rendertracker_destination.
+The extension looks for two command-line parameters: tracker\_target and tracker\_report_path.
 
 Target is the URL to render, output is the location of the log file.
 

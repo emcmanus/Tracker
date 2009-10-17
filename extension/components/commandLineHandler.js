@@ -8,7 +8,7 @@ const nsIModule             = Components.interfaces.nsIModule;
 const nsIWindowWatcher      = Components.interfaces.nsIWindowWatcher;
 
 // Unique
-const CHROME_URI = "chrome://browser/content/browser.xul";
+const CHROME_URI = "chrome://browser/content/";
 const clh_contractID = "@mozilla.org/commandlinehandler/general-startup;1?type=rendertracker";
 const clh_CID = Components.ID("{f4eace90-bacb-11de-8a39-0800200c9a66}");
 const clh_category = "m-rendertracker";
@@ -26,7 +26,6 @@ function openWindow(aChromeURISpec, aArgument)
                 "chrome,dialog=no",
                 aArgument);
 }
-
 
 /**
  * The XPCOM component that implements nsICommandLineHandler.
@@ -61,7 +60,10 @@ const myAppHandler = {
       if (uristr)
 	  {
 		this.wrappedJSObject.targetURI = uristr;
-      }	else {
+		cmdLine.preventDefault = true;
+      }
+	  else
+	  {
 		Components.utils.reportError("Must supply tracker_target as a parameter");
 	  }
     }
@@ -77,7 +79,10 @@ const myAppHandler = {
       if (deststr)
 	  {
 		this.wrappedJSObject.reportPath = deststr;
-      } else {
+		cmdLine.preventDefault = true;
+      }
+	  else
+	  {
 		Components.utils.reportError("Must supply tracker_report_path as a parameter");
 	  }
     }
@@ -86,9 +91,12 @@ const myAppHandler = {
       Components.utils.reportError("incorrect parameter passed to -tracker_report_path on the command line.");
     }
 	
-	// Open window
-	var blankURI = cmdLine.resolveURI( "about:blank" );
-	openWindow(CHROME_URI, blankURI);
+	// Enter branch when there's a) an error, or b) we've set both vars
+	// if ( (this.wrappedJSObject.reportPath && this.wrappedJSObject.targetURI) )
+	// {
+		var blankURI = cmdLine.resolveURI( "about:blank" );
+		openWindow(CHROME_URI, blankURI);
+	// }
   },
 
   helpInfo : "  -tracker_target <uri>\n" +

@@ -1,17 +1,4 @@
-	DONE SO FAR:
-	
-	File printing and closing firefox are stubbed in as methods.
-	
-	I'm pretty sure we can easily do a system call in ruby, which will block until the process exits. But, we'll want
-	to fork that process and kill it if it takes too long to complete (>1 min?).
-	
-	http://whynotwiki.com/Ruby_/_Process_management
-	
-	That will just be a big while true sleep 1000; loop that sits waiting for a new SQS job to be dispatched.
-	
-	We're not going to use Watir or Selenium (or FireDriver or FireWatir) just yet, since they both appear to impact
-	front-end performance significantly.
-
+Be wary of relying on a blocking system call in ruby -- firefox-bin will sometimes daemonize, like when it prints an "updated extension" message.
 
 Disable ALL updates. Firefox starts up with unexpected behavior (multiple tabs, temp start pages etc.)
 
