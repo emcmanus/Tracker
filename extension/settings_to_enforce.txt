@@ -45,3 +45,7 @@ You can not disable this dialog, but you can avoid it by using different profile
 REPLACE ALERTS?
 
 Overwrite window.alert, window.confirm, window.prompt in contentWindow with a function that just returns true or false
+
+
+newrelic hoptoad lighthouse github pingdom
+

@@ -14,6 +14,8 @@ var progressListener;
 
 var cacheSession = null;
 
+var logFile = null;
+
 
 /****************************************************************************************************************
  * Global Constants
@@ -42,6 +44,9 @@ const nsIURI = CI("nsIURI");
 const PrefService = CC("@mozilla.org/preferences-service;1");
 const PermManager = CC("@mozilla.org/permissionmanager;1");
 const DirService =  CCSV("@mozilla.org/file/directory_service;1", "nsIDirectoryServiceProvider");
+
+// Our component, contains command-line parameters
+const trackerService = CC("@mozilla.org/commandlinehandler/general-startup;1?type=rendertracker").getService().wrappedJSObject;
 
 const prefs = PrefService.getService(nsIPrefBranch2);
 const pm = PermManager.getService(nsIPermissionManager);
@@ -128,13 +133,12 @@ _Tracker.flush = function()
 	return _Tracker.logMessages.join("\n");
 }
 
-_Tracker.finished = function()
+_Tracker.exit = function()
 {
 	// Quit the app!
 	var Application = Components.classes["@mozilla.org/fuel/application;1"].getService(Components.interfaces.fuelIApplication);
 	Application.quit();
 }
-
 
 _Tracker.progressListener = null;	// Ref to most recent progressListener
 _Tracker.printFiles = function()
@@ -166,11 +170,10 @@ _Tracker.printFiles = function()
 	
 	var reportString = serialize(report);
 	
-	var fileOut = FileIO.open('/Users/edmcmanus/Code/quicker/tracker/reports/test_out.json');
+	writeToReportFile( reportString );
 	
-	FileIO.write(fileOut, reportString);
-	
-	_Tracker.finished();
+	// Exit
+	_Tracker.exit();
 }
 
 
@@ -178,16 +181,36 @@ _Tracker.printFiles = function()
  * Private
  */
 
+var writeToReportFile = function( str )
+{
+	if (!logFile)
+		logFile = FileIO.open( trackerService.reportPath );
+	
+	if (logFile)
+		if (!FileIO.write(logFile, str))
+			Components.utils.reportError("Error writing to log file.");
+	else
+		Components.utils.reportError("Error opening log file.");
+}
+
 var onWindowLoad = function()
 {
 	// IMMEDIATELY stop load
 	gBrowser.selectedBrowser.webNavigation.stop( STOP_ALL );
 	
+	
+	// Setup check
+	if ( typeof trackerService.reportPath == "undefined" || typeof trackerService.targetURI == "undefined" )
+	{
+		Components.utils.reportError("Did not supply appropriate command-line parameters -tracker_report_path and/or -tracker_target");
+		return;
+	}
+	
 	initialConfig();
 	addEventHooks();
 	
 	// Load target page
-	gBrowser.selectedBrowser.contentWindow.location.href = "http://www.google.com/";
+	gBrowser.selectedBrowser.contentWindow.location.href = trackerService.targetURI;
 	
 	// Print report and exit
 	setTimeout( function(){_Tracker.printFiles();}, 5000 );

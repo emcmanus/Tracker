@@ -1,7 +1,7 @@
 // Namespaces
+
 var _Tracker = function(){};
 var _TrackerLib = function(){};
-
 
 
 /**************************************
@@ -367,6 +367,7 @@ var _TrackerLib = function(){};
 	    // Export our serialize function outside of this anonymous function
 	    _TrackerLib.serialize = function(o) { return s.object(o); };
 	})(); // Invoke the anonymous function once to define JSON.serialize()
+	
 	
 	this.FileIO = {
 			
