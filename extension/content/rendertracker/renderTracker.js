@@ -203,8 +203,10 @@ var writeToReportFile = function( str )
 	}
 	
 	if (logFile)
+	{
 		if (!FileIO.write(logFile, str))
 			Components.utils.reportError("Error writing to log file.");
+	}
 	else
 		Components.utils.reportError("Error opening log file.");
 }

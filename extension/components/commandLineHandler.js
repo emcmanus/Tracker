@@ -1,11 +1,11 @@
-const nsISupports           = Components.interfaces.nsISupports;
-const nsICategoryManager    = Components.interfaces.nsICategoryManager;
+const nsISupports = Components.interfaces.nsISupports;
+const nsICategoryManager = Components.interfaces.nsICategoryManager;
 const nsIComponentRegistrar = Components.interfaces.nsIComponentRegistrar;
-const nsICommandLine        = Components.interfaces.nsICommandLine;
+const nsICommandLine = Components.interfaces.nsICommandLine;
 const nsICommandLineHandler = Components.interfaces.nsICommandLineHandler;
-const nsIFactory            = Components.interfaces.nsIFactory;
-const nsIModule             = Components.interfaces.nsIModule;
-const nsIWindowWatcher      = Components.interfaces.nsIWindowWatcher;
+const nsIFactory = Components.interfaces.nsIFactory;
+const nsIModule = Components.interfaces.nsIModule;
+const nsIWindowWatcher = Components.interfaces.nsIWindowWatcher;
 
 // Unique
 const CHROME_URI = "chrome://browser/content/";
@@ -20,11 +20,11 @@ const clh_category = "m-rendertracker";
  */
 function openWindow(aChromeURISpec, aArgument)
 {
-  var ww = Components.classes["@mozilla.org/embedcomp/window-watcher;1"].
+    var ww = Components.classes["@mozilla.org/embedcomp/window-watcher;1"].
     getService(Components.interfaces.nsIWindowWatcher);
-  ww.openWindow(null, aChromeURISpec, "_blank",
-                "chrome,dialog=no",
-                aArgument);
+    ww.openWindow(null, aChromeURISpec, "_blank",
+	    "chrome,dialog=no",
+	    aArgument);
 }
 
 /**
@@ -32,177 +32,177 @@ function openWindow(aChromeURISpec, aArgument)
  * It also implements nsIFactory to serve as its own singleton factory.
  */
 const myAppHandler = {
-  
-  wrappedJSObject: {
-	targetURIs: [],
-    reportPaths: []
-  },
-  
-  /* nsISupports */
-  QueryInterface : function clh_QI(iid)
-  {
-    if (iid.equals(nsICommandLineHandler) ||
+
+    wrappedJSObject: {
+        targetURIs: [],
+        reportPaths: []
+    },
+
+    /* nsISupports */
+    QueryInterface: function clh_QI(iid)
+    {
+        if (iid.equals(nsICommandLineHandler) ||
         iid.equals(nsIFactory) ||
         iid.equals(nsISupports))
-      return this;
+        return this;
 
-    throw Components.results.NS_ERROR_NO_INTERFACE;
-  },
+        throw Components.results.NS_ERROR_NO_INTERFACE;
+    },
 
-  /* nsICommandLineHandler */
+    /* nsICommandLineHandler */
 
-  handle : function clh_handle(cmdLine)
-  {
+    handle: function clh_handle(cmdLine)
+    {	
+        var uristr,
+            uristrs,
+            deststr,
+            deststrs;
 
-	var uristr, uristrs, deststr, deststrs;
+        // Single Job
+        try
+        {
+            // -tracker_target [URL]
+            uristr = cmdLine.handleFlagWithParam("tracker_target", false);
+            if (uristr)
+            {
+                this.wrappedJSObject.targetURIs.push(uristr);
+                cmdLine.preventDefault = true;
+            }
+        }
+        catch(e)
+        {
+            Components.utils.reportError("incorrect parameter passed to -tracker_target on the command line.");
+        }
 
-	// Single Job
+        try
+        {
+            // -tracker_report_path [path]
+            deststr = cmdLine.handleFlagWithParam("tracker_report_path", false);
+            if (deststr)
+            {
+                this.wrappedJSObject.reportPaths.push(deststr);
+                cmdLine.preventDefault = true;
+            }
+        }
+        catch(e)
+        {
+            Components.utils.reportError("incorrect parameter passed to -tracker_report_path on the command line.");
+        }
 
-	try
-	{
-		// -tracker_target [URL]
-		uristr = cmdLine.handleFlagWithParam("tracker_target", false);
-		if (uristr)
-		{
-			this.wrappedJSObject.targetURIs.push( uristr );
-			cmdLine.preventDefault = true;
-		}
-	}
-	catch (e)
-	{
-		Components.utils.reportError("incorrect parameter passed to -tracker_target on the command line.");
-	}
+        // Batch
+        try
+        {
+            // -tracker_targets [comma-separated paths]
+            uristrs = cmdLine.handleFlagWithParam("tracker_targets", false);
+            if (uristrs)
+            {
+                this.wrappedJSObject.targetURIs = uristrs.split(",");
+                cmdLine.preventDefault = true;
+            }
+        }
+        catch(e)
+        {
+            Components.utils.reportError("incorrect parameter passed to -tracker_targets on the command line.");
+        }
 
-	try
-	{
-		// -tracker_report_path [path]
-		deststr = cmdLine.handleFlagWithParam("tracker_report_path", false);
-		if (deststr)
-		{
-			this.wrappedJSObject.reportPaths.push( deststr );
-			cmdLine.preventDefault = true;
-		}
-	}
-	catch (e)
-	{
-		Components.utils.reportError("incorrect parameter passed to -tracker_report_path on the command line.");
-	}
-	
-	// Batch
+        try
+        {
+            // -tracker_report_paths [comma-separated paths]
+            deststrs = cmdLine.handleFlagWithParam("tracker_report_paths", false);
+            if (deststrs)
+            {
+                this.wrappedJSObject.reportPaths = deststrs.split(",");
+                cmdLine.preventDefault = true;
+            }
+        }
+        catch(e)
+        {
+            Components.utils.reportError("incorrect parameter passed to -tracker_report_paths on the command line.");
+        }
 
-	try
-	{
-		// -tracker_targets [comma-separated paths]
-		uristrs = cmdLine.handleFlagWithParam("tracker_targets", false);
-		if (uristrs)
-		{
-			this.wrappedJSObject.targetURIs = uristrs.split(",");
-			cmdLine.preventDefault = true;
-		}
-	}
-	catch (e)
-	{
-		Components.utils.reportError("incorrect parameter passed to -tracker_targets on the command line.");
-	}
+        // Enter branch when there's a) an error, or b) we've set both vars
+        // if ( (this.wrappedJSObject.reportPaths.length && this.wrappedJSObject.targetURIs.length) )
+        // {
+	        var blankURI = cmdLine.resolveURI("about:blank");
+	        openWindow(CHROME_URI, blankURI);
+        // }
+    },
 
-	try
-	{
-		// -tracker_report_paths [comma-separated paths]
-		deststrs = cmdLine.handleFlagWithParam("tracker_report_paths", false);
-		if (deststrs)
-		{
-			this.wrappedJSObject.reportPaths = deststrs.split(",");
-			cmdLine.preventDefault = true;
-		}
-	}
-	catch (e)
-	{
-		Components.utils.reportError("incorrect parameter passed to -tracker_report_paths on the command line.");
-	}
-	
-	// Enter branch when there's a) an error, or b) we've set both vars
-	// if ( (this.wrappedJSObject.reportPath && this.wrappedJSObject.targetURIs.length) )
-	// {
-		var blankURI = cmdLine.resolveURI( "about:blank" );
-		openWindow(CHROME_URI, blankURI);
-	// }
-  },
+    helpInfo: "  -tracker_target <uri>\n" +
+    "  -tracker_report_path <path>\n",
 
-  helpInfo : "  -tracker_target <uri>\n" +
-             "  -tracker_report_path <path>\n",
+    /* nsIFactory */
 
-  /* nsIFactory */
+    createInstance: function clh_CI(outer, iid)
+    {
+        if (outer != null)
+        throw Components.results.NS_ERROR_NO_AGGREGATION;
 
-  createInstance : function clh_CI(outer, iid)
-  {
-    if (outer != null)
-      throw Components.results.NS_ERROR_NO_AGGREGATION;
+        return this.QueryInterface(iid);
+    },
 
-    return this.QueryInterface(iid);
-  },
-
-  lockFactory : function clh_lock(lock)
-  {
-    /* no-op */
-  }
+    lockFactory: function clh_lock(lock)
+    {
+        /* no-op */
+    }
 };
 
 /**
  * The XPCOM glue that implements nsIModule
  */
 const myAppHandlerModule = {
-  /* nsISupports */
-  QueryInterface : function mod_QI(iid)
-  {
-    if (iid.equals(nsIModule) ||
+    /* nsISupports */
+    QueryInterface: function mod_QI(iid)
+    {
+        if (iid.equals(nsIModule) ||
         iid.equals(nsISupports))
-      return this;
+        return this;
 
-    throw Components.results.NS_ERROR_NO_INTERFACE;
-  },
+        throw Components.results.NS_ERROR_NO_INTERFACE;
+    },
 
-  /* nsIModule */
-  getClassObject : function mod_gch(compMgr, cid, iid)
-  {
-	// Components.utils.reportError("CID: " + cid);
-    if (cid.equals(clh_CID))
-      return myAppHandler.QueryInterface(iid);
+    /* nsIModule */
+    getClassObject: function mod_gch(compMgr, cid, iid)
+    {
+        // Components.utils.reportError("CID: " + cid);
+        if (cid.equals(clh_CID))
+        return myAppHandler.QueryInterface(iid);
 
-    throw Components.results.NS_ERROR_NOT_REGISTERED;
-  },
+        throw Components.results.NS_ERROR_NOT_REGISTERED;
+    },
 
-  registerSelf : function mod_regself(compMgr, fileSpec, location, type)
-  {
-    compMgr.QueryInterface(nsIComponentRegistrar);
+    registerSelf: function mod_regself(compMgr, fileSpec, location, type)
+    {
+        compMgr.QueryInterface(nsIComponentRegistrar);
 
-    compMgr.registerFactoryLocation(clh_CID,
-                                    "myAppHandler",
-                                    clh_contractID,
-                                    fileSpec,
-                                    location,
-                                    type);
+        compMgr.registerFactoryLocation(clh_CID,
+        "myAppHandler",
+        clh_contractID,
+        fileSpec,
+        location,
+        type);
 
-    var catMan = Components.classes["@mozilla.org/categorymanager;1"].
-      getService(nsICategoryManager);
-    catMan.addCategoryEntry("command-line-handler",
-                            clh_category,
-                            clh_contractID, true, true);
-  },
+        var catMan = Components.classes["@mozilla.org/categorymanager;1"].
+        getService(nsICategoryManager);
+        catMan.addCategoryEntry("command-line-handler",
+        clh_category,
+        clh_contractID, true, true);
+    },
 
-  unregisterSelf : function mod_unreg(compMgr, location, type)
-  {
-    compMgr.QueryInterface(nsIComponentRegistrar);
-    compMgr.unregisterFactoryLocation(clh_CID, location);
+    unregisterSelf: function mod_unreg(compMgr, location, type)
+    {
+        compMgr.QueryInterface(nsIComponentRegistrar);
+        compMgr.unregisterFactoryLocation(clh_CID, location);
 
-    var catMan = Components.classes["@mozilla.org/categorymanager;1"].
-      getService(nsICategoryManager);
-    catMan.deleteCategoryEntry("command-line-handler", clh_category);
-  },
+        var catMan = Components.classes["@mozilla.org/categorymanager;1"].
+        getService(nsICategoryManager);
+        catMan.deleteCategoryEntry("command-line-handler", clh_category);
+    },
 
-  canUnload : function (compMgr)
-  {
-    return true;
-  }
+    canUnload: function(compMgr)
+    {
+        return true;
+    }
 };
 
 /* The NSGetModule function is the magic entry point that XPCOM uses to find what XPCOM objects
@@ -210,5 +210,5 @@ const myAppHandlerModule = {
  */
 function NSGetModule(comMgr, fileSpec)
 {
-  return myAppHandlerModule;
+    return myAppHandlerModule;
 }
