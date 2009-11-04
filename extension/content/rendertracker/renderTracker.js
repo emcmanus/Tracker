@@ -155,36 +155,50 @@ _Tracker.exit = function()
 }
 
 _Tracker.progressListener = null;	// Ref to most recent progressListener
-_Tracker.printFiles = function()
+_Tracker.printReportFile = function( success, message )
 {
-	// var report = "";
-	var dest;
-	var curFile = null;
+	var dest, curFile = null;
 	
 	// Build Report Object
 	var report = {};
+	
+	report.assets = [];
 	
 	for ( var i=0; i<_Tracker.progressListener.files.length; i++ )
 	{
 		curFile = _Tracker.progressListener.files[i];
 		
-		dest = report[i] = {};
+		dest = {};
+		
+		report.assets.push( dest )
 		
 		for ( var property in curFile )
 		{
 			if (property)
+			{
 				if (property=="requestHeaders" || property=="responseHeaders")
+				{
 					dest[property] = curFile[property];
+				}
 				else
+				{
 					// Make sure we're not copying any pointers
 					if ( typeof curFile[property] != 'function' && typeof curFile[property] != 'object' )
 						dest[property] = curFile[property];
-		}
-	}
+				}
+			}
+		} // properties
+	} // files
 	
-	var reportString = serialize(report);
+	// Page events
+	report.pageEvents = _Tracker.progressListener.pageEvents;
 	
-	writeToReportFile( reportString );
+	// Successful?
+	report.success = Boolean(success);
+	report.message = message || "";
+	
+	// Write
+	writeToReportFile( serialize(report) );
 	
 	startNextJob();
 }
@@ -193,6 +207,38 @@ _Tracker.printFiles = function()
 /****************************************************************************************************************
  * Private
  */
+
+
+// Print Timer
+var forceTimer;	// Set in startNextJob
+var printTimer = setInterval( function(){ printTimerTick(); }, 300 );
+var hasSeenLoadEvent = false;
+var hasSeenDomContentReadyEvent = false;
+var hasSeenMajorPaintEvent = false;
+
+function printTimerTick( force )
+{
+	if ( force || (hasSeenLoadEvent && hasSeenDomContentReadyEvent && hasSeenMajorPaintEvent) )
+	{
+		// Reset
+		hasSeenLoadEvent = false;
+		hasSeenDomContentReadyEvent = false;
+		hasSeenMajorPaintEvent = false;
+
+		// Clear force timer, it'll reset when we start the next job
+		clearInterval( forceTimer );
+		
+		var errorMessage = "";
+		
+		if (force)
+		{
+			errorMessage = "Forced shutdown: did not capture minimum required events.";
+		}
+		
+		// Print, start next job
+		setTimeout( function(){_Tracker.printReportFile( !force, errorMessage );}, 10000 );	// 10 seconds to allow initial AJAX requests
+	}
+}
 
 var writeToReportFile = function( str )
 {
@@ -215,14 +261,24 @@ var startNextJob = function()
 {
 	if ( trackerService.targetURIs.length )
 	{
+		// IMMEDIATELY stop load
+		gBrowser.selectedBrowser.webNavigation.stop( STOP_ALL );
+		
 		// Set log file target
 		logFile = FileIO.open( trackerService.reportPaths.pop() );
+		
+		consoleWarning("\tADDING LISTENERS");
+		
+		// Add page-specific listeners
+		gBrowser.selectedBrowser.addEventListener( "MozAfterPaint", function(e){progressListener.onPaint(e)}, true );
+		gBrowser.selectedBrowser.addEventListener( "DOMContentLoaded", function(e){progressListener.onDomContentLoaded(e)}, true );
+		gBrowser.selectedBrowser.addEventListener( "load", function(e){progressListener.onLoad(e)}, true );
 		
 		// Load target page
 		gBrowser.selectedBrowser.contentWindow.location.href = trackerService.targetURIs.pop();
 		
-		// Print report and exit
-		setTimeout( function(){_Tracker.printFiles();}, 5000 );
+		// Add fail-safe timer, in case something goes wrong
+		forceTimer = setTimeout( function(){ printTimerTick(true); }, 60000 )
 	}
 	else
 	{
@@ -257,8 +313,9 @@ var initialConfig = function()
 {
 	// Force our settings
 	
-	prefs.setBoolPref("browser.cache.disk.enable", ALLOW_CACHE); // cache
-	prefs.setBoolPref("browser.cache.memory.enable", ALLOW_CACHE); // cache
+	prefs.setBoolPref( "browser.cache.disk.enable", ALLOW_CACHE ); // cache
+	prefs.setBoolPref( "browser.cache.memory.enable", ALLOW_CACHE ); // cache
+	prefs.setBoolPref( "network.http.use-cache", ALLOW_CACHE ); // cache
 	prefs.setBoolPref( "browser.accept.redirects", ALLOW_REDIRECTS ); // redirects
 	prefs.setBoolPref( "browser.accept.refreshes", ALLOW_CONTENT_REFRESHES ); // content refresh
 	
@@ -307,6 +364,7 @@ var addEventHooks = function()
 	// Add Listeners
 	_Tracker.progressListener = progressListener = new ProgressListener( context );
 	
+	// Add to context
 	context.progressListener = progressListener;
 	
 	gBrowser.selectedBrowser.addProgressListener( progressListener, NOTIFY_ALL );
@@ -314,6 +372,12 @@ var addEventHooks = function()
 	observerService.addObserver(progressListener, "http-on-modify-request", false);
     observerService.addObserver(progressListener, "http-on-examine-response", false);
 }
+
+var removeEventHooks = function()
+{
+	// todo
+}
+
 
 function createContext()
 {
@@ -854,6 +918,10 @@ function ProgressListener( context )
         this.documents = [];
         this.windows = [];
 
+		this.pageEvents = [];	// {type:"", data:{rects:[], time:[], ...}}
+		
+		this.hadMajorPaint = false;	// Re-painted > 35% of the window
+		
         queue = [];
     };
 
@@ -1198,7 +1266,47 @@ ProgressListener.prototype =
             this.post(this.respondedFile, [request, now()]);
         }
     },
+	
+	//
+	// contentWindow events
+	
+	onDomContentLoaded: function(e)
+	{
+		// consoleWarning("DOMContentLoaded" + e.eventPhase.toString());
+		
+		this.pageEvents.push( {type:"DomContentLoaded", data: {time: now()} });
+		
+		hasSeenDomContentReadyEvent = true;
+	},
+	
+	onLoad: function(e)
+	{
+		if (e.eventPhase == Event.CAPTURING_PHASE)	// Capturing
+		{
+			// consoleWarning("\tON LOAD, " + e.eventPhase);
 
+			this.pageEvents.push({type:"Load", data: {time: now()} });
+			
+			hasSeenLoadEvent = true;
+		}
+	},
+	
+	onPaint: function(e)
+	{
+		// consoleWarning("MOZAFTERPAINT event" + e.eventPhase.toString());
+		
+		var boundingClientRect = e.boundingClientRect;
+		var boundingArea = boundingClientRect.width * boundingClientRect.height;
+		var windowArea = this.context.window.outerWidth * this.context.window.outerHeight;
+		
+		this.pageEvents.push( {type:"MozAfterPaint", data: {rects: e.clientRects, bounds: boundingClientRect, time: now()}} );
+		
+		if ( boundingArea >= 0.35 * windowArea )
+		{
+			hasSeenMajorPaintEvent = true;
+		}
+	},
+	
 	//
     // nsIWebProgressListener
 
